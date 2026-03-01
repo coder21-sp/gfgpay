@@ -105,7 +105,6 @@ transactionSchema.index({ sender: 1, createdAt: -1 });
 transactionSchema.index({ receiver: 1, createdAt: -1 });
 transactionSchema.index({ status: 1 });
 transactionSchema.index({ type: 1 });
-transactionSchema.index({ idempotencyKey: 1 });
 transactionSchema.index({ createdAt: -1 });
 
 // Compound index for user transaction history

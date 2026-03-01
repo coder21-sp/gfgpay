@@ -94,11 +94,6 @@ userSchema.virtual('fullName').get(function () {
   return `${this.firstName} ${this.lastName}`;
 });
 
-// Indexes
-userSchema.index({ email: 1 });
-userSchema.index({ phoneNumber: 1 });
-userSchema.index({ upiId: 1 });
-
 // Pre-save middleware to hash password and generate UPI ID
 userSchema.pre('save', async function (next) {
   // Hash password if modified

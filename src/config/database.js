@@ -1,10 +1,11 @@
 const mongoose = require('mongoose');
-const config = require('./index');
 const logger = require('../utils/logger');
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(config.mongoose.url, config.mongoose.options);
+    // Read URI dynamically so in-memory MongoDB URI override works
+    const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/gfgpay';
+    const conn = await mongoose.connect(uri, {});
     logger.info(`MongoDB Connected: ${conn.connection.host}`);
     
     mongoose.connection.on('error', (err) => {
@@ -26,10 +27,6 @@ const connectDB = async () => {
   } catch (error) {
     logger.error(`Error connecting to MongoDB: ${error.message}`);
     process.exit(1);
-  }
-  finally {
-    logger.info('MongoDB connection closed through app termination');
-    process.exit(0);
   }
 };
 

@@ -1,3 +1,4 @@
+require('dotenv').config();
 const app = require('./app');
 const config = require('./config');
 const connectDB = require('./config/database');
@@ -7,6 +8,15 @@ let server;
 
 const startServer = async () => {
   try {
+    // Use in-memory MongoDB when no real URI is available (development)
+    if (config.env !== 'production' && (!process.env.MONGODB_URI || process.env.MONGODB_URI.includes('localhost'))) {
+      const { MongoMemoryServer } = require('mongodb-memory-server');
+      const mongod = await MongoMemoryServer.create();
+      const uri = mongod.getUri();
+      process.env.MONGODB_URI = uri;
+      logger.info(`[DEV] Using in-memory MongoDB at: ${uri}`);
+    }
+
     await connectDB();
     
     server = app.listen(config.port, () => {

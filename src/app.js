@@ -3,6 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const mongoSanitize = require('express-mongo-sanitize');
+const path = require('path');
 
 const config = require('./config');
 const routes = require('./routes');
@@ -37,6 +38,9 @@ app.use('/api', generalLimiter);
 
 // API routes
 app.use('/api/v1', routes);
+
+// Serve static frontend files
+app.use(express.static(path.join(__dirname, '../frontend')));
 
 // Root route
 app.get('/', (req, res) => {
