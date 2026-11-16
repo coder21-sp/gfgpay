@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { Wallet, Transaction } = require('../models');
+const { Wallet, Transaction, BankAccount } = require('../models');
 const ApiError = require('../utils/ApiError');
 const logger = require('../utils/logger');
 const config = require('../config');
@@ -39,7 +39,7 @@ const getBalance = async (userId) => {
 /**
  * Add money to wallet (deposit)
  */
-const addMoney = async (userId, amount, source, sourceId = null, idempotencyKey = null) => {
+const addMoney = async (userId, amount, source, sourceId = null, idempotencyKey = null, requestFingerprint = null) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   
@@ -64,6 +64,7 @@ const addMoney = async (userId, amount, source, sourceId = null, idempotencyKey 
         status: 'processing',
         description: `Deposit via ${source}`,
         idempotencyKey,
+        requestFingerprint,
         metadata: {
           source,
           sourceId,
@@ -101,7 +102,10 @@ const addMoney = async (userId, amount, source, sourceId = null, idempotencyKey 
 /**
  * Withdraw money from wallet
  */
-const withdrawMoney = async (userId, amount, bankAccountId, idempotencyKey = null) => {
+const withdrawMoney = async (userId, amount, bankAccountId, idempotencyKey = null, requestFingerprint = null) => {
+  if (!await BankAccount.exists({ _id: bankAccountId, user: userId, isActive: true })) {
+    throw ApiError.notFound('Bank account not found');
+  }
   const session = await mongoose.startSession();
   session.startTransaction();
   
@@ -130,6 +134,7 @@ const withdrawMoney = async (userId, amount, bankAccountId, idempotencyKey = nul
         status: 'processing',
         description: 'Withdrawal to bank account',
         idempotencyKey,
+        requestFingerprint,
         metadata: {
           bankAccountId,
         },

@@ -9,7 +9,8 @@ const transferByUpi = catchAsync(async (req, res) => {
     receiverUpiId,
     amount,
     note,
-    req.idempotencyKey
+    req.idempotencyKey,
+    req.paymentFingerprint
   );
   
   res.status(200).json({
@@ -34,7 +35,8 @@ const transferByPhone = catchAsync(async (req, res) => {
     receiverPhone,
     amount,
     note,
-    req.idempotencyKey
+    req.idempotencyKey,
+    req.paymentFingerprint
   );
   
   res.status(200).json({
@@ -59,7 +61,8 @@ const transferById = catchAsync(async (req, res) => {
     receiverId,
     amount,
     note,
-    req.idempotencyKey
+    req.idempotencyKey,
+    req.paymentFingerprint
   );
   
   ApiResponse.transactionSuccess(res, result.transaction, 'Transfer successful');

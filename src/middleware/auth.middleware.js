@@ -19,6 +19,7 @@ const authenticate = catchAsync(async (req, res, next) => {
   
   try {
     const decoded = jwt.verify(token, config.jwt.secret);
+    if (decoded.type !== 'access') throw ApiError.unauthorized('Access token required');
     
     const user = await User.findById(decoded.sub);
     if (!user) {

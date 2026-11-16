@@ -69,8 +69,8 @@
                     <div class="user-profile">
                         <img src="https://ui-avatars.com/api/?name=Alex+Doe&background=0D8ABC&color=fff&rounded=true" alt="User Profile" class="avatar">
                         <div class="user-info">
-                            <span class="user-name">Alex Doe</span>
-                            <span class="user-role">Premium User</span>
+                            <span class="user-name">Your account</span>
+                            <span class="user-role">Demo wallet</span>
                         </div>
                         <i class="ri-arrow-down-s-line"></i>
                     </div>
@@ -90,18 +90,18 @@
                                 <i class="ri-bank-card-line"></i>
                             </div>
                             <div class="card-balance">
-                                <h2>$12,450.<span>00</span></h2>
-                                <span class="trend positive"><i class="ri-arrow-right-up-line"></i> +2.5%</span>
+                                <h2>₹0.<span>00</span></h2>
+                                <span class="trend positive"><i class="ri-arrow-right-up-line"></i> Demo funds</span>
                             </div>
                             <div class="card-footer">
-                                <p>**** **** **** 4281</p>
-                                <div class="card-logo">VISA</div>
+                                <p>Wallet simulator</p>
+                                <div class="card-logo">INR</div>
                             </div>
                             <div class="glass-reflection"></div>
                         </div>
 
                         <div class="quick-actions">
-                            <button class="action-btn" onclick="openTransferModal()">
+                            <button class="action-btn">
                                 <div class="icon-wrapper blue">
                                     <i class="ri-send-plane-fill"></i>
                                 </div>
@@ -139,9 +139,9 @@
                         </div>
                         <form class="transfer-form" id="transferForm">
                             <div class="input-group">
-                                <label>Amount (USD)</label>
+                                <label>Amount (INR)</label>
                                 <div class="amount-input">
-                                    <span class="currency-symbol">$</span>
+                                    <span class="currency-symbol">₹</span>
                                     <input type="number" id="transferAmount" placeholder="0.00" min="1" step="0.01" required>
                                 </div>
                             </div>
@@ -177,9 +177,9 @@
             <h3>Login to GFGPay</h3>
             <form id="authForm" class="transfer-form" style="text-align: left; margin-top: 20px;">
                 <div class="input-group">
-                    <label>Phone Number (e.g. +1234567890)</label>
+                    <label>Phone Number (e.g. 9876543210)</label>
                     <div class="amount-input" style="padding: 0 16px;">
-                        <input type="text" id="authPhone" placeholder="+1234567890" required style="font-size: 16px;">
+                        <input type="text" id="authPhone" placeholder="9876543210" required style="font-size: 16px;">
                     </div>
                 </div>
                 <div class="input-group">
@@ -213,9 +213,9 @@
                     </div>
                 </div>
                 <div class="input-group">
-                    <label>Phone (+...)</label>
+                    <label>10-digit Indian mobile number</label>
                     <div class="amount-input" style="padding: 0 16px;">
-                        <input type="text" id="regPhone" placeholder="+1234567890" required style="font-size: 16px;">
+                        <input type="text" id="regPhone" placeholder="9876543210" required style="font-size: 16px;">
                     </div>
                 </div>
                 <div class="input-group">
@@ -238,8 +238,8 @@
                 </div>
             </div>
             <h3>Transfer Successful!</h3>
-            <p>You have successfully sent <strong id="modalAmount">$0.00</strong> to <strong id="modalRecipient">Recipient</strong>.</p>
-            <button class="btn-primary mt-4" onclick="closeModal()">Done</button>
+            <p>You have successfully sent <strong id="modalAmount">₹0.00</strong> to <strong id="modalRecipient">Recipient</strong>.</p>
+            <button class="btn-primary mt-4">Done</button>
         </div>
     </div>
 

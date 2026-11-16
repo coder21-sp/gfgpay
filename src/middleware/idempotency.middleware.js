@@ -1,3 +1,4 @@
+const { createHash } = require('crypto');
 const { Transaction } = require('../models');
 const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
@@ -22,7 +23,13 @@ const checkIdempotency = catchAsync(async (req, res, next) => {
   // Check if transaction with this key already exists
   const existingTransaction = await Transaction.findByIdempotencyKey(idempotencyKey);
   
+  const payload = Object.fromEntries(Object.entries(req.body).filter(([key]) => key !== 'pin').sort(([a], [b]) => a.localeCompare(b)));
+  req.paymentFingerprint = createHash('sha256').update(JSON.stringify([String(req.user._id), req.originalUrl.split('?')[0], payload])).digest('hex');
   if (existingTransaction) {
+    const owner = existingTransaction.type === 'deposit' ? existingTransaction.receiver : existingTransaction.sender;
+    if (String(owner) !== String(req.user._id) || existingTransaction.requestFingerprint !== req.paymentFingerprint) {
+      throw ApiError.conflict('Idempotency key belongs to a different request');
+    }
     // Return the existing transaction result
     if (existingTransaction.status === 'completed') {
       return res.status(200).json({
@@ -63,36 +70,4 @@ const checkIdempotency = catchAsync(async (req, res, next) => {
   next();
 });
 
-/**
- * Optional idempotency check (doesn't fail if key missing)
- */
-const optionalIdempotency = catchAsync(async (req, res, next) => {
-  const idempotencyKey = req.headers['x-idempotency-key'] || req.headers['idempotency-key'];
-  
-  if (idempotencyKey) {
-    const existingTransaction = await Transaction.findByIdempotencyKey(idempotencyKey);
-    
-    if (existingTransaction && existingTransaction.status === 'completed') {
-      return res.status(200).json({
-        success: true,
-        message: 'Transaction already processed',
-        data: {
-          transactionId: existingTransaction._id,
-          referenceId: existingTransaction.referenceId,
-          amount: existingTransaction.amount,
-          status: existingTransaction.status,
-          idempotent: true,
-        },
-      });
-    }
-    
-    req.idempotencyKey = idempotencyKey;
-  }
-  
-  next();
-});
-
-module.exports = {
-  checkIdempotency,
-  optionalIdempotency,
-};
+module.exports = { checkIdempotency };

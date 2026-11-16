@@ -18,7 +18,7 @@ const errorConverter = (err, req, res, next) => {
     } else if (error instanceof mongoose.Error.CastError) {
       error = ApiError.badRequest(`Invalid ${error.path}: ${error.value}`);
     } else if (error.code === 11000) {
-      const field = Object.keys(error.keyValue)[0];
+      const field = Object.keys(error.keyValue || error.keyPattern || {})[0] || 'Record';
       error = ApiError.conflict(`${field} already exists`);
     } else if (error.name === 'JsonWebTokenError') {
       error = ApiError.unauthorized('Invalid token');

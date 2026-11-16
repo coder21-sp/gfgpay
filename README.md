@@ -38,9 +38,9 @@ cp env.example .env
 # Edit .env with your MongoDB URI
 ```
 
-### 3. Start MongoDB
+### 3. Start MongoDB (replica set required)
 
-Make sure MongoDB is running locally or update the connection string.
+Use MongoDB Atlas or a local replica set. Standalone MongoDB does not support the multi-document transactions used by payments. For local development, start mongod with --replSet rs0, run rs.initiate() in mongosh, and use mongodb://localhost:27017/gfgpay?replicaSet=rs0.
 
 ### 4. Seed Database
 
@@ -210,3 +210,11 @@ gfgpay/
 ## License
 
 MIT
+
+## Verification and scope
+
+Run `npm ci`, `npm test -- --runInBand`, and `npm run lint`. Integration tests use a temporary MongoDB replica set; the first run downloads MongoDB.
+
+This is a wallet simulator: deposits create demo funds and withdrawals record simulated bank payouts. It does not connect to UPI or banking networks and does not confirm payments offline. The web UI supports login, registration, PIN setup, balances, recent contacts/history, transfers and demo top-ups. Other UI shortcuts are placeholders.
+
+Payment requests require a UUID Idempotency-Key. Replays must match the authenticated user, endpoint and normalized payload; conflicting reuse returns 409. Existing transactions without request fingerprints cannot be replayed through the updated middleware. After a network failure, check history before creating a new payment.

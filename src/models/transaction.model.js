@@ -70,6 +70,7 @@ const transactionSchema = new mongoose.Schema(
         ref: 'Transaction',
       },
     },
+    requestFingerprint: String,
     idempotencyKey: {
       type: String,
       sparse: true,
@@ -100,7 +101,7 @@ const transactionSchema = new mongoose.Schema(
 );
 
 // Indexes for efficient queries
-transactionSchema.index({ referenceId: 1 });
+
 transactionSchema.index({ sender: 1, createdAt: -1 });
 transactionSchema.index({ receiver: 1, createdAt: -1 });
 transactionSchema.index({ status: 1 });
@@ -111,7 +112,7 @@ transactionSchema.index({ createdAt: -1 });
 transactionSchema.index({ sender: 1, receiver: 1, createdAt: -1 });
 
 // Pre-save: Generate reference ID
-transactionSchema.pre('save', function (next) {
+transactionSchema.pre('validate', function (next) {
   if (this.isNew && !this.referenceId) {
     this.referenceId = generateReferenceId();
   }

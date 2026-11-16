@@ -1,5 +1,5 @@
 const Joi = require('joi');
-const { amount, pin } = require('./common.validation');
+const { amount, pin, objectId } = require('./common.validation');
 
 const getBalance = {
   // No body required
@@ -16,7 +16,7 @@ const addMoney = {
 const withdrawMoney = {
   body: Joi.object().keys({
     amount: amount.required().min(1).max(100000),
-    bankAccountId: Joi.string().required(),
+    bankAccountId: Joi.string().custom(objectId).required(),
     pin: pin.required(),
   }),
 };

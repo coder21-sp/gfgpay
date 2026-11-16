@@ -136,7 +136,7 @@ const logout = async (refreshToken) => {
     const decoded = tokenService.verifyRefreshToken(refreshToken);
     const user = await User.findById(decoded.sub).select('+refreshToken');
     
-    if (user) {
+    if (user && user.refreshToken === refreshToken) {
       user.refreshToken = null;
       await user.save();
     }

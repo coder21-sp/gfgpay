@@ -8,7 +8,7 @@ const config = require('../config');
 /**
  * Transfer money by UPI ID
  */
-const transferByUpi = async (senderId, receiverUpiId, amount, note, idempotencyKey) => {
+const transferByUpi = async (senderId, receiverUpiId, amount, note, idempotencyKey, requestFingerprint = null) => {
   // Find receiver
   const receiver = await User.findByUpiId(receiverUpiId);
   
@@ -20,13 +20,13 @@ const transferByUpi = async (senderId, receiverUpiId, amount, note, idempotencyK
     throw ApiError.badRequest('Cannot transfer to yourself');
   }
   
-  return executeTransfer(senderId, receiver._id, amount, note, idempotencyKey);
+  return executeTransfer(senderId, receiver._id, amount, note, idempotencyKey, requestFingerprint);
 };
 
 /**
  * Transfer money by phone number
  */
-const transferByPhone = async (senderId, receiverPhone, amount, note, idempotencyKey) => {
+const transferByPhone = async (senderId, receiverPhone, amount, note, idempotencyKey, requestFingerprint = null) => {
   // Find receiver
   const receiver = await User.findByPhone(receiverPhone);
   
@@ -38,13 +38,13 @@ const transferByPhone = async (senderId, receiverPhone, amount, note, idempotenc
     throw ApiError.badRequest('Cannot transfer to yourself');
   }
   
-  return executeTransfer(senderId, receiver._id, amount, note, idempotencyKey);
+  return executeTransfer(senderId, receiver._id, amount, note, idempotencyKey, requestFingerprint);
 };
 
 /**
  * Transfer money by user ID
  */
-const transferById = async (senderId, receiverId, amount, note, idempotencyKey) => {
+const transferById = async (senderId, receiverId, amount, note, idempotencyKey, requestFingerprint = null) => {
   if (senderId.toString() === receiverId.toString()) {
     throw ApiError.badRequest('Cannot transfer to yourself');
   }
@@ -55,13 +55,13 @@ const transferById = async (senderId, receiverId, amount, note, idempotencyKey) 
     throw ApiError.notFound('Receiver not found');
   }
   
-  return executeTransfer(senderId, receiverId, amount, note, idempotencyKey);
+  return executeTransfer(senderId, receiverId, amount, note, idempotencyKey, requestFingerprint);
 };
 
 /**
  * Execute the actual transfer with database transaction
  */
-const executeTransfer = async (senderId, receiverId, amount, note, idempotencyKey) => {
+const executeTransfer = async (senderId, receiverId, amount, note, idempotencyKey, requestFingerprint = null) => {
   // Validate amount
   if (amount < config.transaction.minAmount) {
     throw ApiError.badRequest(`Minimum transfer amount is ₹${config.transaction.minAmount}`);
@@ -123,7 +123,9 @@ const executeTransfer = async (senderId, receiverId, amount, note, idempotencyKe
         amount,
         status: 'processing',
         note,
-        idempotexncyKey,
+        idempotencyKey,
+        requestFingerprint,
+
         description: `Transfer to ${receiver.fullName}`,
         metadata: {
           senderUpiId: sender.upiId,

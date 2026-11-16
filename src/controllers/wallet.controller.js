@@ -14,7 +14,8 @@ const addMoney = catchAsync(async (req, res) => {
     amount,
     source,
     sourceId,
-    req.idempotencyKey
+    req.idempotencyKey,
+    req.paymentFingerprint
   );
   ApiResponse.transactionSuccess(res, result.transaction, 'Money added successfully');
 });
@@ -25,7 +26,8 @@ const withdrawMoney = catchAsync(async (req, res) => {
     req.user._id,
     amount,
     bankAccountId,
-    req.idempotencyKey
+    req.idempotencyKey,
+    req.paymentFingerprint
   );
   ApiResponse.transactionSuccess(res, result.transaction, 'Withdrawal initiated');
 });

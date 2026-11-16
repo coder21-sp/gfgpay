@@ -40,7 +40,6 @@ const userSchema = new mongoose.Schema(
     pin: {
       type: String,
       minlength: [4, 'PIN must be 4 digits'],
-      maxlength: [6, 'PIN cannot exceed 6 digits'],
       select: false,
     },
     upiId: {
