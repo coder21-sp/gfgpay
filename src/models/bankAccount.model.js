@@ -64,17 +64,6 @@ const bankAccountSchema = new mongoose.Schema(
 bankAccountSchema.index({ user: 1 });
 bankAccountSchema.index({ user: 1, isPrimary: 1 });
 
-// Ensure only one primary account per user
-bankAccountSchema.pre('save', async function (next) {
-  if (this.isPrimary && this.isModified('isPrimary')) {
-    await this.constructor.updateMany(
-      { user: this.user, _id: { $ne: this._id } },
-      { isPrimary: false }
-    );
-  }
-  next();
-});
-
 /**
  * Get primary bank account for user
  */

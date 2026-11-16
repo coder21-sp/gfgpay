@@ -15,10 +15,10 @@ router.get('/verify', validate(transferValidation.verifyReceiver), transferContr
 router.post(
   '/upi',
   transferLimiter,
-  checkIdempotency,
   checkWalletStatus,
-  verifyPin,
   validate(transferValidation.transferByUpi),
+  verifyPin,
+  checkIdempotency,
   transferController.transferByUpi
 );
 
@@ -26,10 +26,10 @@ router.post(
 router.post(
   '/phone',
   transferLimiter,
-  checkIdempotency,
   checkWalletStatus,
-  verifyPin,
   validate(transferValidation.transferByPhone),
+  verifyPin,
+  checkIdempotency,
   transferController.transferByPhone
 );
 
@@ -37,10 +37,10 @@ router.post(
 router.post(
   '/user',
   transferLimiter,
-  checkIdempotency,
   checkWalletStatus,
-  verifyPin,
   validate(transferValidation.transferById),
+  verifyPin,
+  checkIdempotency,
   transferController.transferById
 );
 

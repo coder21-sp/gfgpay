@@ -1,4 +1,6 @@
 const mongoose = require('mongoose');
+const config = require('../config');
+const ApiError = require('../utils/ApiError');
 
 const walletSchema = new mongoose.Schema(
   {
@@ -59,7 +61,7 @@ const walletSchema = new mongoose.Schema(
 );
 
 // Indexes
-walletSchema.index({ user: 1 });
+
 walletSchema.index({ isActive: 1 });
 
 /**
@@ -73,13 +75,14 @@ walletSchema.methods.hasSufficientBalance = function (amount) {
  * Credit amount to wallet (atomic operation with optimistic locking)
  */
 walletSchema.methods.credit = async function (amount, session = null) {
+  if (!Number.isFinite(amount) || amount <= 0 || Math.abs(amount * 100 - Math.round(amount * 100)) > 1e-7) throw ApiError.badRequest('Invalid amount');
   const currentVersion = this.version;
   
   const result = await this.constructor.findOneAndUpdate(
     { _id: this._id, version: currentVersion },
     {
+      $set: { balance: Math.round((this.balance + amount) * 100) / 100 },
       $inc: {
-        balance: amount,
         totalReceived: amount,
         version: 1,
       },
@@ -98,8 +101,12 @@ walletSchema.methods.credit = async function (amount, session = null) {
  * Debit amount from wallet (atomic operation with optimistic locking)
  */
 walletSchema.methods.debit = async function (amount, session = null) {
+  if (!Number.isFinite(amount) || amount <= 0 || Math.abs(amount * 100 - Math.round(amount * 100)) > 1e-7) throw ApiError.badRequest('Invalid amount');
   const currentVersion = this.version;
   
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const spent = this.dailySpentDate < today ? 0 : this.dailySpent;
+  if (spent + amount > config.transaction.dailyLimit) throw ApiError.badRequest('Daily transfer limit exceeded');
   // Check balance first
   if (this.balance < amount) {
     throw new Error('Insufficient balance');
@@ -112,10 +119,9 @@ walletSchema.methods.debit = async function (amount, session = null) {
       balance: { $gte: amount },
     },
     {
+      $set: { balance: Math.round((this.balance - amount) * 100) / 100, dailySpent: Math.round((spent + amount) * 100) / 100, dailySpentDate: today },
       $inc: {
-        balance: -amount,
         totalSent: amount,
-        dailySpent: amount,
         version: 1,
       },
     },
@@ -139,7 +145,8 @@ walletSchema.methods.resetDailySpent = async function () {
   if (this.dailySpentDate < today) {
     this.dailySpent = 0;
     this.dailySpentDate = today;
-    await this.save();
+    const updated = await this.constructor.findOneAndUpdate({ _id: this._id, dailySpentDate: { $lt: today } }, { $set: { dailySpent: 0, dailySpentDate: today }, $inc: { version: 1 } }, { new: true });
+    Object.assign(this, (updated || await this.constructor.findById(this._id)).toObject());
   }
 };
 

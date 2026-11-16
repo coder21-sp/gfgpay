@@ -15,7 +15,7 @@ router.get('/', bankAccountController.getBankAccounts);
 router.post('/', validate(bankAccountValidation.addBankAccount), bankAccountController.addBankAccount);
 
 // Get bank account by ID
-router.get('/:accountId', bankAccountController.getBankAccount);
+router.get('/:accountId', validate(bankAccountValidation.deleteBankAccount), bankAccountController.getBankAccount);
 
 // Update bank account
 router.patch('/:accountId', validate(bankAccountValidation.updateBankAccount), bankAccountController.updateBankAccount);
@@ -24,6 +24,6 @@ router.patch('/:accountId', validate(bankAccountValidation.updateBankAccount), b
 router.delete('/:accountId', validate(bankAccountValidation.deleteBankAccount), bankAccountController.deleteBankAccount);
 
 // Set as primary
-router.post('/:accountId/primary', bankAccountController.setPrimaryAccount);
+router.post('/:accountId/primary', validate(bankAccountValidation.deleteBankAccount), bankAccountController.setPrimaryAccount);
 
 module.exports = router;

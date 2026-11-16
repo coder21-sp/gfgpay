@@ -14,7 +14,8 @@ const addMoney = catchAsync(async (req, res) => {
     amount,
     source,
     sourceId,
-    req.idempotencyKey
+    req.idempotencyKey,
+    req.paymentFingerprint
   );
   ApiResponse.transactionSuccess(res, result.transaction, 'Money added successfully');
 });
@@ -25,7 +26,8 @@ const withdrawMoney = catchAsync(async (req, res) => {
     req.user._id,
     amount,
     bankAccountId,
-    req.idempotencyKey
+    req.idempotencyKey,
+    req.paymentFingerprint
   );
   ApiResponse.transactionSuccess(res, result.transaction, 'Withdrawal initiated');
 });
@@ -33,11 +35,6 @@ const withdrawMoney = catchAsync(async (req, res) => {
 const checkTransferEligibility = catchAsync(async (req, res) => {
   const result = await walletService.canTransfer(req.user._id, req.body.amount);
   ApiResponse.success(res, 200, 'Eligibility checked', result);
-});
-
-const getWalletTransactions = catchAsync(async (req, res) => {
-  const transactions = await walletService.getWalletTransactions(req.user._id);
-  ApiResponse.success(res, 200, 'Wallet transactions retrieved', { transactions });
 });
 
 module.exports = {

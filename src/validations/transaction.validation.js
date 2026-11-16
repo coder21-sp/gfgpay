@@ -7,7 +7,7 @@ const getTransactions = {
     type: Joi.string().valid('transfer', 'deposit', 'withdrawal', 'refund', 'cashback'),
     status: Joi.string().valid('pending', 'processing', 'completed', 'failed', 'reversed'),
     startDate: Joi.date().iso(),
-    endDate: Joi.date().iso().min(Joi.ref('startDate')),
+    endDate: Joi.date().iso().when('startDate', { is: Joi.exist(), then: Joi.date().min(Joi.ref('startDate')) }),
   }),
 };
 

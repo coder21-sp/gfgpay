@@ -17,19 +17,18 @@ const register = async (userData) => {
     throw ApiError.conflict('Phone number already registered');
   }
   
-  // Create user
-  const user = await User.create(userData);
-  
-  // Create wallet for user
-  await Wallet.create({ user: user._id });
-  
-  // Generate tokens
-  const tokens = tokenService.generateAuthTokens(user._id);
-  
-  // Save refresh token
-  user.refreshToken = tokens.refresh.token;
-  await user.save();
-  
+  const session = await require('mongoose').startSession();
+  let user, tokens;
+  try {
+    await session.withTransaction(async () => {
+      [user] = await User.create([userData], { session });
+      await Wallet.create([{ user: user._id }], { session });
+      tokens = tokenService.generateAuthTokens(user._id, user.authVersion);
+      user.refreshToken = tokens.refresh.token;
+      await user.save({ session });
+    });
+  } finally { await session.endSession(); }
+
   logger.info(`New user registered: ${user.email}`);
   
   return { user, tokens };
@@ -54,7 +53,7 @@ const login = async (phoneNumber, password) => {
     throw ApiError.unauthorized('Invalid phone number or password');
   }
   
-  const tokens = tokenService.generateAuthTokens(user._id);
+  const tokens = tokenService.generateAuthTokens(user._id, user.authVersion);
   
   // Update user
   user.refreshToken = tokens.refresh.token;
@@ -89,7 +88,7 @@ const loginWithEmail = async (email, password) => {
     throw ApiError.unauthorized('Invalid email or password');
   }
   
-  const tokens = tokenService.generateAuthTokens(user._id);
+  const tokens = tokenService.generateAuthTokens(user._id, user.authVersion);
   
   user.refreshToken = tokens.refresh.token;
   user.lastLogin = new Date();
@@ -117,10 +116,10 @@ const refreshAuth = async (refreshToken) => {
       throw ApiError.unauthorized('Account is deactivated');
     }
     
-    const tokens = tokenService.generateAuthTokens(user._id);
+    const tokens = tokenService.generateAuthTokens(user._id, user.authVersion);
     
-    user.refreshToken = tokens.refresh.token;
-    await user.save();
+    const updated = await User.findOneAndUpdate({ _id: user._id, refreshToken, isActive: true, authVersion: user.authVersion }, { $set: { refreshToken: tokens.refresh.token } });
+    if (!updated) throw ApiError.unauthorized('Refresh token already used');
     
     return tokens;
   } catch (error) {
@@ -136,9 +135,8 @@ const logout = async (refreshToken) => {
     const decoded = tokenService.verifyRefreshToken(refreshToken);
     const user = await User.findById(decoded.sub).select('+refreshToken');
     
-    if (user) {
-      user.refreshToken = null;
-      await user.save();
+    if (user && user.refreshToken === refreshToken) {
+      await User.updateOne({ _id: user._id, refreshToken }, { $set: { refreshToken: null }, $inc: { authVersion: 1 } });
     }
   } catch (error) {
     // Silently handle
@@ -194,42 +192,11 @@ const changePassword = async (userId, currentPassword, newPassword) => {
   }
   
   user.password = newPassword;
-  user.refreshToken = null; // Invalidate all sessions
+  user.refreshToken = null;
+  user.authVersion += 1; // Invalidate access and refresh sessions
   await user.save();
   
   logger.info(`Password changed for user: ${userId}`);
-};
-
-const forgotPassword = async (email) => {
-  const user = await User.findOne({ email });
-  if (!user) {
-    throw ApiError.notFound('User not found');
-  }
-  await user.save();
-};
-
-const resetPassword = async (token, password) => {
-  const user = await User.findOne({ resetPasswordToken: token });
-  if (!user) {
-    throw ApiError.notFound('User not found');
-  }
-  await user.save();
-};
-
-const verifyEmail = async (token) => {
-  const user = await User.findOne({ verificationToken: token });
-  if (!user) {
-    throw ApiError.notFound('User not found');
-  }
-  await user.save();
-};
-
-const resendVerificationEmail = async (email) => {
-  const user = await User.findOne({ email });
-  if (!user) {
-    throw ApiError.notFound('User not found');
-  }
-  await user.save();
 };
 
 module.exports = {

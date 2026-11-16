@@ -19,12 +19,14 @@ const authenticate = catchAsync(async (req, res, next) => {
   
   try {
     const decoded = jwt.verify(token, config.jwt.secret);
+    if (decoded.type !== 'access') throw ApiError.unauthorized('Access token required');
     
     const user = await User.findById(decoded.sub);
     if (!user) {
       throw ApiError.unauthorized('User no longer exists');
     }
     
+    if ((decoded.authVersion || 0) !== user.authVersion) throw ApiError.unauthorized('Session revoked');
     if (!user.isActive) {
       throw ApiError.unauthorized('User account is deactivated');
     }

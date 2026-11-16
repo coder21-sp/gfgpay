@@ -18,9 +18,9 @@ router.post('/check-balance', validate(transferValidation.checkBalance), walletC
 router.post(
   '/add-money',
   paymentLimiter,
-  checkIdempotency,
   checkWalletStatus,
   validate(walletValidation.addMoney),
+  checkIdempotency,
   walletController.addMoney
 );
 
@@ -28,10 +28,10 @@ router.post(
 router.post(
   '/withdraw',
   paymentLimiter,
-  checkIdempotency,
   checkWalletStatus,
-  verifyPin,
   validate(walletValidation.withdrawMoney),
+  verifyPin,
+  checkIdempotency,
   walletController.withdrawMoney
 );
 

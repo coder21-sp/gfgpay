@@ -1,93 +1,39 @@
-const { BankAccount } = require('../models');
+const mongoose = require('mongoose');
+const { BankAccount, User } = require('../models');
 const ApiError = require('../utils/ApiError');
-
-/**
- * Add bank account
- */
-const addBankAccount = async (userId, accountData) => {
-  // Check for duplicate account number
-  const existing = await BankAccount.findOne({
-    user: userId,
-    accountNumber: accountData.accountNumber,
-    isActive: true,
-  });
-  
-  if (existing) {
-    throw ApiError.conflict('Bank account already added');
-  }
-  
-  const bankAccount = await BankAccount.create({
-    ...accountData,
-    user: userId,
-  });
-  
-  return bankAccount;
-};
-
-/**
- * Get all bank accounts for user
- */
-const getBankAccounts = async (userId) => {
-  return BankAccount.getByUserId(userId);
-};
-
-/**
- * Get bank account by ID
- */
-const getBankAccountById = async (accountId, userId) => {
-  const bankAccount = await BankAccount.findOne({
-    _id: accountId,
-    user: userId,
-    isActive: true,
-  });
-  
-  if (!bankAccount) {
-    throw ApiError.notFound('Bank account not found');
-  }
-  
-  return bankAccount;
-};
-
-/**
- * Update bank account
- */
-const updateBankAccount = async (accountId, userId, updateData) => {
-  const bankAccount = await getBankAccountById(accountId, userId);
-  
-  Object.assign(bankAccount, updateData);
-  await bankAccount.save();
-  
-  return bankAccount;
-};
-
-/**
- * Delete bank account
- */
-const deleteBankAccount = async (accountId, userId) => {
-  const bankAccount = await getBankAccountById(accountId, userId);
-  
-  // Don't actually delete, just mark as inactive
-  bankAccount.isActive = false;
-  await bankAccount.save();
-};
-
-/**
- * Set primary bank account
- */
-const setPrimaryAccount = async (accountId, userId) => {
-  const bankAccount = await getBankAccountById(accountId, userId);
-  
-  bankAccount.isPrimary = true;
-  await bankAccount.save();
-  
-  return bankAccount;
-};
-
-module.exports = {
-  addBankAccount,
-  getBankAccounts,
-  getBankAccountById,
-  updateBankAccount,
-  deleteBankAccount,
-  setPrimaryAccount,
-};
+// Serialize account edits for one owner, so competing primary selections cannot both win.
+async function editAccounts(userId, fn) {
+  const session = await mongoose.startSession();
+  try {
+    return await session.withTransaction(async () => {
+      await User.updateOne({ _id: userId }, { $inc: { bankVersion: 1 } }, { session });
+      return fn(session);
+    });
+  } finally { await session.endSession(); }
+}
+const getBankAccounts = userId => BankAccount.getByUserId(userId);
+async function getBankAccountById(accountId, userId, session = null) {
+  const account = await BankAccount.findOne({ _id: accountId, user: userId, isActive: true }).session(session);
+  if (!account) throw ApiError.notFound('Bank account not found');
+  return account;
+}
+const addBankAccount = (userId, data) => editAccounts(userId, async session => {
+  if (await BankAccount.exists({ user: userId, accountNumber: data.accountNumber, isActive: true }).session(session)) throw ApiError.conflict('Bank account already added');
+  if (data.isPrimary) await BankAccount.updateMany({ user: userId, isPrimary: true }, { $set: { isPrimary: false } }, { session });
+  const [account] = await BankAccount.create([{ ...data, user: userId }], { session });
+  return account;
+});
+const updateBankAccount = (accountId, userId, data) => editAccounts(userId, async session => {
+  const account = await getBankAccountById(accountId, userId, session);
+  if (data.isPrimary) await BankAccount.updateMany({ user: userId, isPrimary: true }, { $set: { isPrimary: false } }, { session });
+  account.isPrimary = data.isPrimary;
+  await account.save({ session });
+  return account;
+});
+const deleteBankAccount = (accountId, userId) => editAccounts(userId, async session => {
+  const account = await getBankAccountById(accountId, userId, session);
+  account.isActive = false; account.isPrimary = false;
+  await account.save({ session });
+});
+const setPrimaryAccount = (accountId, userId) => updateBankAccount(accountId, userId, { isPrimary: true });
+module.exports = { addBankAccount, getBankAccounts, getBankAccountById, updateBankAccount, deleteBankAccount, setPrimaryAccount };

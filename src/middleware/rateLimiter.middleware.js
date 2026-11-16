@@ -36,6 +36,7 @@ const authLimiter = rateLimit({
 const paymentLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
   max: config.rateLimit.paymentMax,
+  keyGenerator: (req) => String(req.user._id),
   message: {
     success: false,
     message: 'Too many payment requests, please try again after a minute',
@@ -49,7 +50,8 @@ const paymentLimiter = rateLimit({
  */
 const transferLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 5, // 5 transfers per minute
+  max: Number(process.env.TRANSFER_RATE_LIMIT_MAX) || 5,
+  keyGenerator: (req) => String(req.user._id),
   message: {
     success: false,
     message: 'Transfer limit reached. Please wait before making another transfer.',

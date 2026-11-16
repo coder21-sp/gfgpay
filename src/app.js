@@ -18,7 +18,7 @@ app.use(helmet());
 // CORS
 app.use(cors({
   origin: '*',
-  credentials: true,
+  credentials: false,
 }));
 
 // Request logging

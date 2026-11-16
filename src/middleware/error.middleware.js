@@ -6,7 +6,16 @@ const logger = require('../utils/logger');
 /**
  * Convert non-ApiError errors to ApiError
  */
-const errorConverter = (err, req, res, next) => {
+const errorConverter = async (err, req, res, next) => {
+  if (err.code === 11000 && req.idempotencyKey && req.paymentFingerprint) {
+    try {
+      const tx = await require('../models').Transaction.findOne({ idempotencyKey: req.idempotencyKey, requestFingerprint: req.paymentFingerprint });
+      const owner = tx?.type === 'deposit' ? tx?.receiver : tx?.sender;
+      if (tx?.status === 'completed' && String(owner) === String(req.user?._id)) {
+        return require('../utils/ApiResponse').transactionSuccess(res, tx, 'Transaction already processed');
+      }
+    } catch (lookupError) { return next(lookupError); }
+  }
   let error = err;
   
   if (!(error instanceof ApiError)) {
@@ -18,7 +27,7 @@ const errorConverter = (err, req, res, next) => {
     } else if (error instanceof mongoose.Error.CastError) {
       error = ApiError.badRequest(`Invalid ${error.path}: ${error.value}`);
     } else if (error.code === 11000) {
-      const field = Object.keys(error.keyValue)[0];
+      const field = Object.keys(error.keyValue || error.keyPattern || {})[0] || 'Record';
       error = ApiError.conflict(`${field} already exists`);
     } else if (error.name === 'JsonWebTokenError') {
       error = ApiError.unauthorized('Invalid token');

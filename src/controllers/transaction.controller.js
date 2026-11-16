@@ -39,11 +39,6 @@ const getRecentContacts = catchAsync(async (req, res) => {
   ApiResponse.success(res, 200, 'Contacts retrieved', { contacts });
 });
 
-const getTransactionByAccountId = catchAsync(async (req, res) => {
-  const transactions = await transactionService.getTransactionByAccountId(req.params.accountId, req.user._id);
-  ApiResponse.success(res, 200, 'Transactions retrieved', { transactions });
-});
-
 module.exports = {
   getTransactions,
   getTransaction,

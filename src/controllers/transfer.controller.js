@@ -9,7 +9,8 @@ const transferByUpi = catchAsync(async (req, res) => {
     receiverUpiId,
     amount,
     note,
-    req.idempotencyKey
+    req.idempotencyKey,
+    req.paymentFingerprint
   );
   
   res.status(200).json({
@@ -34,7 +35,8 @@ const transferByPhone = catchAsync(async (req, res) => {
     receiverPhone,
     amount,
     note,
-    req.idempotencyKey
+    req.idempotencyKey,
+    req.paymentFingerprint
   );
   
   res.status(200).json({
@@ -59,16 +61,13 @@ const transferById = catchAsync(async (req, res) => {
     receiverId,
     amount,
     note,
-    req.idempotencyKey
+    req.idempotencyKey,
+    req.paymentFingerprint
   );
   
   ApiResponse.transactionSuccess(res, result.transaction, 'Transfer successful');
 });
 
-const reverseTransaction = catchAsync(async (req, res) => {
-  const result = await transferService.reverseTransaction(req.params.transactionId, req.user._id);
-  ApiResponse.success(res, 200, 'Transaction reversed', result);
-});
 const verifyReceiver = catchAsync(async (req, res) => {
   const result = await transferService.verifyReceiver(req.user._id, req.query);
   ApiResponse.success(res, 200, 'Receiver verified', result);

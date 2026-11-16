@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 
-const { User, Wallet, Transaction } = require('../models');
+const { User, Wallet, Transaction, BankAccount } = require('../models');
 const config = require('../config');
 
 const seedData = async () => {
@@ -16,6 +16,7 @@ const seedData = async () => {
       User.deleteMany({}),
       Wallet.deleteMany({}),
       Transaction.deleteMany({}),
+      BankAccount.deleteMany({}),
     ]);
 
     // Create test users

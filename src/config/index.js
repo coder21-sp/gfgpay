@@ -40,4 +40,5 @@ const config = {
   },
 };
 
+if (config.env === 'production' && (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32)) throw new Error('Set JWT_SECRET to at least 32 characters');
 module.exports = config;
