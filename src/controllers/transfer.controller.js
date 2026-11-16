@@ -68,10 +68,6 @@ const transferById = catchAsync(async (req, res) => {
   ApiResponse.transactionSuccess(res, result.transaction, 'Transfer successful');
 });
 
-const reverseTransaction = catchAsync(async (req, res) => {
-  const result = await transferService.reverseTransaction(req.params.transactionId, req.user._id);
-  ApiResponse.success(res, 200, 'Transaction reversed', result);
-});
 const verifyReceiver = catchAsync(async (req, res) => {
   const result = await transferService.verifyReceiver(req.user._id, req.query);
   ApiResponse.success(res, 200, 'Receiver verified', result);

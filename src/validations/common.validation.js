@@ -32,7 +32,7 @@ const pin = Joi.string()
 // Amount validator
 const amount = Joi.number()
   .positive()
-  .precision(2)
+  .precision(2).strict()
   .messages({
     'number.positive': 'Amount must be positive',
   });

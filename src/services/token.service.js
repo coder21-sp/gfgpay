@@ -5,8 +5,8 @@ const config = require('../config');
 /**
  * Generate access token
  */
-const generateAccessToken = (userId) => {
-  const payload = { sub: userId, type: 'access' };
+const generateAccessToken = (userId, authVersion = 0) => {
+  const payload = { sub: userId, type: 'access', authVersion };
   return jwt.sign(payload, config.jwt.secret, {
     expiresIn: `${config.jwt.accessExpirationMinutes}m`,
   });
@@ -15,8 +15,8 @@ const generateAccessToken = (userId) => {
 /**
  * Generate refresh token
  */
-const generateRefreshToken = (userId) => {
-  const payload = { sub: userId, type: 'refresh', jti: randomUUID() };
+const generateRefreshToken = (userId, authVersion = 0) => {
+  const payload = { sub: userId, type: 'refresh', authVersion, jti: randomUUID() };
   return jwt.sign(payload, config.jwt.secret, {
     expiresIn: `${config.jwt.refreshExpirationDays}d`,
   });
@@ -25,9 +25,9 @@ const generateRefreshToken = (userId) => {
 /**
  * Generate both tokens
  */
-const generateAuthTokens = (userId) => {
-  const accessToken = generateAccessToken(userId);
-  const refreshToken = generateRefreshToken(userId);
+const generateAuthTokens = (userId, authVersion = 0) => {
+  const accessToken = generateAccessToken(userId, authVersion);
+  const refreshToken = generateRefreshToken(userId, authVersion);
   
   return {
     access: {

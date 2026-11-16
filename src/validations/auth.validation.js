@@ -20,7 +20,7 @@ const login = {
 
 const loginWithEmail = {
   body: Joi.object().keys({
-    email: Joi.string().required().email(),
+    email: Joi.string().required().email().trim().lowercase(),
     password: Joi.string().required(),
   }),
 };

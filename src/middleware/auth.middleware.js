@@ -26,6 +26,7 @@ const authenticate = catchAsync(async (req, res, next) => {
       throw ApiError.unauthorized('User no longer exists');
     }
     
+    if ((decoded.authVersion || 0) !== user.authVersion) throw ApiError.unauthorized('Session revoked');
     if (!user.isActive) {
       throw ApiError.unauthorized('User account is deactivated');
     }

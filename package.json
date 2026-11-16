@@ -8,8 +8,9 @@
     "dev": "nodemon src/server.js",
     "seed": "node src/seeds/index.js",
     "test": "jest --coverage",
-    "lint": "eslint src/",
-    "lint:fix": "eslint src/ --fix"
+    "lint": "eslint src frontend/script.js",
+    "lint:fix": "eslint src/ --fix",
+    "test:browser": "node tests/browser.cjs"
   },
   "keywords": [
     "payment",
@@ -44,6 +45,7 @@
     "jest": "^29.7.0",
     "mongodb-memory-server": "^11.0.1",
     "nodemon": "^3.0.2",
+    "playwright": "^1.65.1",
     "supertest": "^6.3.3"
   },
   "engines": {

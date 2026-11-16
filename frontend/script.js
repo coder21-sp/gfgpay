@@ -1,415 +1,65 @@
-function escapeHtml(value) { const el = document.createElement('span'); el.textContent = value; return el.innerHTML; }
-// API State
-let authToken = localStorage.getItem('gfgpay_token') || null;
-let currentUser = null;
-let currentWallet = null;
-
-const API_BASE = '/api/v1';
-
-// DOM Elements
-const authModal = document.getElementById('authModal');
-const authForm = document.getElementById('authForm');
-const registerForm = document.getElementById('registerForm');
-const toggleAuthMode = document.getElementById('toggleAuthMode');
-const authFooter = document.getElementById('authFooter');
-
-const recentContactsEl = document.getElementById('recent-contacts');
-const transactionListEl = document.getElementById('transactionList');
-const transferForm = document.getElementById('transferForm');
-const transferModal = document.getElementById('transferModal');
-
-// Init
-document.addEventListener('DOMContentLoaded', () => {
-    if (authToken) {
-        authModal.classList.remove('active');
-        fetchDashboardData();
-    } else {
-        authModal.classList.add('active');
-    }
-});
-
-// Auth Logic
-let isLoginMode = true;
-authFooter.addEventListener('click', (e) => {
-    if (!e.target.closest('#toggleAuthMode')) return;
-    e.preventDefault();
-    isLoginMode = !isLoginMode;
-    if (isLoginMode) {
-        authForm.style.display = 'block';
-        registerForm.style.display = 'none';
-        authFooter.innerHTML = `Don't have an account? <a href="#" id="toggleAuthMode" style="color: var(--primary);">Register</a>`;
-
-    } else {
-        authForm.style.display = 'none';
-        registerForm.style.display = 'block';
-        authFooter.innerHTML = `Already have an account? <a href="#" id="toggleAuthMode" style="color: var(--primary);">Login</a>`;
-
-    }
-});
-
-authForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const phone = document.getElementById('authPhone').value;
-    const password = document.getElementById('authPassword').value;
-
-    try {
-        const res = await fetch(`${API_BASE}/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phoneNumber: phone, password })
-        });
-        const data = await res.json();
-
-        if (data.success) {
-            authToken = data.data.tokens.access.token;
-            localStorage.setItem('gfgpay_token', authToken);
-            authModal.classList.remove('active');
-            fetchDashboardData();
-        } else {
-            alert(data.message || 'Login failed');
-        }
-    } catch (err) {
-        console.error(err);
-        alert('An error occurred during login');
-    }
-});
-
-registerForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const firstName = document.getElementById('regFirstName').value;
-    const lastName = document.getElementById('regLastName').value;
-    const email = document.getElementById('regEmail').value;
-    const phoneNumber = document.getElementById('regPhone').value;
-    const password = document.getElementById('regPassword').value;
-
-    try {
-        const res = await fetch(`${API_BASE}/auth/register`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ firstName, lastName, email, phoneNumber, password })
-        });
-        const data = await res.json();
-
-        if (data.success) {
-            authToken = data.data.tokens.access.token;
-            localStorage.setItem('gfgpay_token', authToken);
-            authModal.classList.remove('active');
-
-            // Ask the user to choose a PIN; never install a shared default.
-            const chosenPin = prompt('Choose a 4–6 digit transaction PIN');
-            if (!/^\d{4,6}$/.test(chosenPin || '')) { alert('Set a PIN using Settings before transferring.'); fetchDashboardData(); return; }
-            const pinResponse = await fetch(`${API_BASE}/auth/pin/set`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Idempotency-Key': crypto.randomUUID(),
-                    'Authorization': `Bearer ${authToken}`
-                },
-                body: JSON.stringify({ pin: chosenPin, confirmPin: chosenPin })
-            });
-            if (!pinResponse.ok) alert((await pinResponse.json()).message);
-
-            fetchDashboardData();
-        } else {
-            alert(data.message || 'Registration failed');
-        }
-    } catch (err) {
-        console.error(err);
-        alert('An error occurred during registration');
-    }
-});
-
-// Logout
-document.querySelector('.logout').addEventListener('click', (e) => {
-    e.preventDefault();
-    localStorage.removeItem('gfgpay_token');
-    authToken = null; currentUser = null; currentWallet = null; selectedContact = null;
-    transactionListEl.replaceChildren(); recentContactsEl.replaceChildren();
-    document.querySelector('.card-balance h2').textContent = '—';
-    authModal.classList.add('active');
-});
-
-// Fetch Real Data
-async function fetchDashboardData() {
-    try {
-        const [profileRes, balanceRes, txRes, contactsRes] = await Promise.all([
-            fetch(`${API_BASE}/auth/profile`, { headers: { 'Authorization': `Bearer ${authToken}` } }),
-            fetch(`${API_BASE}/wallet/balance`, { headers: { 'Authorization': `Bearer ${authToken}` } }),
-            fetch(`${API_BASE}/transactions`, { headers: { 'Authorization': `Bearer ${authToken}` } }),
-            fetch(`${API_BASE}/transactions/contacts`, { headers: { 'Authorization': `Bearer ${authToken}` } })
-        ]);
-
-        if (profileRes.status === 401) { authToken = null; localStorage.removeItem('gfgpay_token'); authModal.classList.add('active'); throw new Error('Session expired. Please log in again.'); }
-        const profileData = await profileRes.json();
-        const balanceData = await balanceRes.json();
-        const txData = await txRes.json();
-        const contactsData = await contactsRes.json();
-
-        if (profileData.success) {
-            currentUser = profileData.data.user;
-            document.querySelector('.user-name').innerText = `${currentUser.firstName} ${currentUser.lastName}`;
-            document.querySelector('.avatar').src = `https://ui-avatars.com/api/?name=${currentUser.firstName}+${currentUser.lastName}&background=0D8ABC&color=fff&rounded=true`;
-        }
-
-        if (balanceData.success) {
-            currentWallet = balanceData.data;
-            const balanceInt = Math.floor(currentWallet.balance);
-            const balanceDec = (currentWallet.balance % 1).toFixed(2).substring(2);
-            document.querySelector('.card-balance h2').innerHTML = `₹${balanceInt}.<span>${balanceDec}</span>`;
-        }
-
-        if (contactsData.success) {
-            renderContacts(contactsData.data.contacts.map(c => ({ id: c._id, name: c.fullName || `${c.firstName} ${c.lastName}`, phone: c.phoneNumber, upiId: c.upiId })));
-        }
-
-        if (txData.success) {
-            renderTransactions(txData.data);
-        }
-    } catch (err) {
-        console.error('Error fetching dashboard data:', err);
-    }
+'use strict';
+const $ = id => document.getElementById(id);
+let tokens = JSON.parse(sessionStorage.getItem('gfgpay_session') || 'null');
+let user = null, page = 1, refreshPromise = null, paymentBusy = false;
+const money = value => new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR'}).format(value);
+const fields = form => Object.fromEntries(new FormData(form));
+function message(text, error = false) { $('message').textContent = text; $('message').className = error ? 'error' : ''; }
+function saveSession(value) { tokens=value; if(value) sessionStorage.setItem('gfgpay_session',JSON.stringify(value)); else sessionStorage.removeItem('gfgpay_session'); }
+function signedOut() { $('register').hidden=true; $('login').hidden=false; $('authTitle').textContent='Log in'; $('toggleAuth').textContent='Create an account'; saveSession(null); user=null; $('app').hidden=true; $('auth').hidden=false; document.querySelectorAll('#app form').forEach(f=>f.reset()); }
+async function api(path, options={}, retry=true) {
+ const controller=new AbortController(); const timeout=setTimeout(()=>controller.abort(),20000);
+ let response;
+ try { response=await fetch('/api/v1'+path,{...options,signal:controller.signal,headers:{'Content-Type':'application/json',...(tokens?{Authorization:'Bearer '+tokens.access.token}:{}),...options.headers}}); }
+ catch { const e=new Error('Connection interrupted. Payment status may be unknown.'); e.network=true; throw e; }
+ finally {clearTimeout(timeout);}
+ if(response.status===401 && tokens && retry && !['/auth/login','/auth/register','/auth/refresh-tokens','/auth/logout'].includes(path)) {
+  if(!refreshPromise) refreshPromise=api('/auth/refresh-tokens',{method:'POST',body:JSON.stringify({refreshToken:tokens.refresh.token})},false).then(r=>saveSession(r.data.tokens)).finally(()=>{refreshPromise=null;});
+  try {await refreshPromise;} catch(e) {signedOut();throw e;}
+  return api(path,options,false);
+ }
+ const result=await response.json();
+ if(!response.ok){const e=new Error(result.message||'Request failed');e.status=response.status;throw e;}
+ return result;
 }
-
-// Render Contacts
-let selectedContact = null;
-function renderContacts(contactsList) {
-    recentContactsEl.innerHTML = '';
-
-    // Add default "Add New" button
-    const defaultContacts = [{
-        id: 'new',
-        name: 'Add New',
-        phone: '',
-        upiId: '',
-        initials: '+'
-    }];
-
-    const allContacts = [...contactsList, ...defaultContacts];
-
-    allContacts.forEach(contact => {
-        const namePart = contact.name || 'Unknown';
-        const imgUrl = contact.id === 'new'
-            ? 'https://ui-avatars.com/api/?name=%2B&background=f1f5f9&color=64748b'
-            : `https://ui-avatars.com/api/?name=${namePart.replace(' ', '+')}&background=random`;
-
-        const img = document.createElement('img');
-        img.src = imgUrl;
-        img.alt = namePart;
-        img.title = namePart;
-
-        if (!selectedContact && contact.id !== 'new') {
-            selectedContact = contact;
-        }
-
-        img.className = `contact-avatar ${selectedContact && contact.id === selectedContact.id ? 'selected' : ''}`;
-
-        img.addEventListener('click', () => {
-            if(contact.id === 'new') {
-                const phone = prompt('Enter phone number to transfer to:');
-                if(phone) {
-                    selectedContact = { id: 'manual', phone, name: phone };
-                    renderContacts(contactsList);
-                }
-            } else {
-                selectedContact = contact;
-                renderContacts(contactsList);
-            }
-        });
-
-        recentContactsEl.appendChild(img);
-    });
+const post = (path,body) => api(path,{method:'POST',body:JSON.stringify(body)});
+function bindForm(id, handler) {$(id).addEventListener('submit',async e=>{e.preventDefault();const form=e.currentTarget;const button=form.querySelector('button');if(button.disabled)return;button.disabled=true;try{await handler(fields(form),form);}catch(err){message(err.message,true);}finally{button.disabled=false;}});}
+function action(id, fn){$(id).addEventListener('click',()=>Promise.resolve().then(fn).catch(e=>message(e.message,true)));}
+async function view(id){document.querySelectorAll('.view').forEach(el=>{el.hidden=el.id!==id;});document.querySelectorAll('[data-view]').forEach(el=>el.setAttribute('aria-current',el.dataset.view===id?'page':'false'));if(id==='history')await history();if(id==='analytics')await analytics();if(id==='settings')await banks();}
+document.querySelectorAll('[data-view]').forEach(el=>el.addEventListener('click',()=>view(el.dataset.view).catch(e=>message(e.message,true))));
+action('toggleAuth',()=>{const registering=$('register').hidden;$('register').hidden=!registering;$('login').hidden=registering;$('authTitle').textContent=registering?'Create account':'Log in';$('toggleAuth').textContent=registering?'Back to login':'Create an account';});
+async function enter(){const r=await api('/auth/profile');user=r.data.user;$('name').textContent=user.fullName;$('upi').textContent=user.upiId;$('auth').hidden=true;$('app').hidden=false;showPending();await view('dashboard');await dashboard();}
+bindForm('login',async(body,form)=>{const r=await post('/auth/login',body);saveSession(r.data.tokens);form.reset();await enter();message('Logged in.');});
+bindForm('register',async(body,form)=>{const r=await post('/auth/register',body);saveSession(r.data.tokens);form.reset();await enter();await view('settings');message('Account created. Choose a transaction PIN in Settings.');});
+action('logout',async()=>{try{await post('/auth/logout',{refreshToken:tokens.refresh.token});}finally{signedOut();message('Logged out on this device.');}});
+async function dashboard(){const [balance,contacts]=await Promise.all([api('/wallet/balance'),api('/transactions/contacts')]);$('balance').textContent=money(balance.data.balance);$('limit').textContent='Remaining daily spending limit: '+money(balance.data.remainingDailyLimit);$('contacts').replaceChildren(new Option('Choose a contact',''));contacts.data.contacts.forEach(c=>$('contacts').add(new Option(c.fullName||`${c.firstName} ${c.lastName}`,c.upiId)));}
+$('contacts').addEventListener('change',()=>{$('transfer').elements.recipient.value=$('contacts').value;});action('refresh',dashboard);
+function pendingKey(){return 'gfgpay_pending_'+user._id;}
+function pending(){return JSON.parse(localStorage.getItem(pendingKey())||'null');}
+function showPending(){const p=pending();$('pending').hidden=!p;if(p)$('pendingText').textContent=`${money(p.body.amount)} · ${p.body.receiverUpiId||p.body.receiverPhone||p.path}. Check status before making another payment.`;}
+async function payment(path,body,existing=null){
+ if(paymentBusy)throw new Error('A payment is already being submitted.');
+ if(!user)throw new Error('Log in first.');
+ if(pending()&&!existing)throw new Error('Resolve the pending payment first.');
+ const ownerKey=pendingKey();const safeBody={...body};delete safeBody.pin;
+ const p=existing||{key:crypto.randomUUID(),path,body:safeBody};
+ localStorage.setItem(ownerKey,JSON.stringify(p));showPending();paymentBusy=true;
+ try{const r=await api(path,{method:'POST',headers:{'Idempotency-Key':p.key},body:JSON.stringify(body)});
+  if(r.data.status==='completed'){localStorage.removeItem(ownerKey);message(`Confirmed: ${money(r.data.amount)} · ${r.data.referenceId}`);}else message('Payment is processing. Check its status.');
+ }catch(e){if([400,403,404,422].includes(e.status))localStorage.removeItem(ownerKey);throw e;}
+ finally{paymentBusy=false;if(user)showPending();}
+ await dashboard();
 }
-
-// Render Transactions
-function renderTransactions(txList) {
-    transactionListEl.innerHTML = '';
-
-    if(!txList || txList.length === 0) {
-        transactionListEl.innerHTML = '<p style="text-align:center; color: var(--text-muted); padding: 20px;">No transactions found.</p>';
-        return;
-    }
-
-    txList.forEach(tx => {
-        // Determine type from my perspective
-        let isIncome = false;
-        let txTitle = tx.description || 'Transaction';
-        let txIcon = 'ri-exchange-dollar-line';
-        let iconClass = 'transfer';
-
-        if (tx.type === 'deposit') {
-            isIncome = true;
-            txTitle = 'Deposit';
-            txIcon = 'ri-briefcase-4-fill';
-            iconClass = 'income';
-        } else if (tx.type === 'withdrawal') {
-            isIncome = false;
-            txTitle = 'Withdrawal';
-            txIcon = 'ri-bank-card-line';
-            iconClass = 'expense';
-        } else if (tx.type === 'transfer') {
-            if (tx.direction === 'credit') {
-                isIncome = true;
-                txTitle = `Received from ${tx.sender?.phoneNumber || 'User'}`;
-                txIcon = 'ri-arrow-left-down-line';
-                iconClass = 'income';
-            } else {
-                isIncome = false;
-                txTitle = `Sent to ${tx.receiver?.phoneNumber || 'User'}`;
-                txIcon = 'ri-arrow-right-up-line';
-                iconClass = 'expense';
-            }
-        }
-
-        const amountClass = isIncome ? 'positive' : 'negative';
-        const formattedAmount = `${isIncome ? '+' : '-'}₹${Math.abs(tx.amount).toFixed(2)}`;
-        const dateStr = new Date(tx.createdAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit' });
-
-        const html = `
-            <div class="tx-item">
-                <div class="tx-info">
-                    <div class="tx-icon ${iconClass}">
-                        <i class="${txIcon}"></i>
-                    </div>
-                    <div class="tx-details">
-                        <h4>${escapeHtml(txTitle)}</h4>
-                        <p>${dateStr}</p>
-                    </div>
-                </div>
-                <div class="tx-amount ${amountClass}">
-                    ${formattedAmount}
-                </div>
-            </div>
-        `;
-        transactionListEl.insertAdjacentHTML('beforeend', html);
-    });
-}
-
-// Handle Transfer Form
-transferForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if (transferForm.dataset.busy) return;
-    const amountInput = document.getElementById('transferAmount').value;
-
-    if(!amountInput || amountInput <= 0) return;
-
-    if(!selectedContact) {
-        alert("Please select or add a contact to transfer to.");
-        return;
-    }
-
-    // Default PIN for this demo is 1234 since we set it on register
-    // Or prompt for it!
-    const pin = prompt('Enter your transaction PIN:');
-    if(!pin) return;
-    transferForm.dataset.busy = 'true';
-
-    try {
-        const payload = {
-            amount: parseFloat(amountInput),
-            pin: pin,
-            note: 'Transfer from Web UI'
-        };
-
-        if (selectedContact.upiId) {
-            payload.receiverUpiId = selectedContact.upiId;
-        } else {
-            payload.receiverPhone = selectedContact.phone;
-        }
-
-        const endpoint = selectedContact.upiId ? '/transfer/upi' : '/transfer/phone';
-
-        const res = await paymentFetch(`${API_BASE}${endpoint}`,  {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Idempotency-Key': crypto.randomUUID(),
-                'Authorization': `Bearer ${authToken}`
-            },
-            body: JSON.stringify(payload)
-        });
-
-        const data = await res.json();
-
-        if (data.success && data.data.status === 'completed') {
-            // Show modal
-            document.getElementById('modalAmount').innerText = `₹${parseFloat(amountInput).toFixed(2)}`;
-            document.getElementById('modalRecipient').innerText = selectedContact.name || selectedContact.phone;
-            transferModal.classList.add('active');
-
-            // Refresh data
-            fetchDashboardData();
-
-            // Reset form
-            transferForm.reset();
-        } else {
-            alert(data.message || 'Transfer failed');
-        }
-    } catch (err) {
-        console.error(err);
-        alert('Transfer status unknown. Check transaction history before sending again.');
-    } finally { delete transferForm.dataset.busy; }
-});
-
-// Top Up Flow (Adding money to wallet to play around)
-document.querySelector('.icon-wrapper.purple').parentElement.addEventListener('click', async (e) => {
-    e.preventDefault();
-    const amount = prompt('How much would you like to top up?');
-    if(amount && parseFloat(amount) > 0) {
-        try {
-            const res = await paymentFetch(`${API_BASE}/wallet/add-money`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Idempotency-Key': crypto.randomUUID(),
-                    'Authorization': `Bearer ${authToken}`
-                },
-                body: JSON.stringify({ amount: parseFloat(amount), source: 'bank' })
-            });
-            const data = await res.json();
-            if(data.success) {
-                alert('Wallet topped up successfully!');
-                fetchDashboardData();
-            } else {
-                alert(data.message || 'Top up failed');
-            }
-        } catch (err) {
-            console.error(err);
-            alert('Error topping up wallet');
-        }
-    }
-});
-
-// Modal Actions
-function closeModal() {
-    transferModal.classList.remove('active');
-}
-
-window.openTransferModal = () => {
-    document.getElementById('transferAmount').focus();
-};
-window.closeModal = closeModal;
-
-// Helmet blocks inline onclick handlers.
-document.querySelector('.icon-wrapper.blue').parentElement.addEventListener('click', window.openTransferModal);
-document.querySelector('#transferModal button').addEventListener('click', closeModal);
-document.querySelector('.icon-wrapper.green').parentElement.addEventListener('click', () => alert(currentUser ? `Your wallet ID: ${currentUser.upiId}` : 'Please log in'));
-
-document.querySelectorAll('.nav-item').forEach(link => { if (link.textContent.trim() === 'Settings') link.addEventListener('click', async e => { e.preventDefault(); const pin = prompt('Set your transaction PIN (4–6 digits)'); if (!/^\d{4,6}$/.test(pin || '')) return; try { const r = await fetch(`${API_BASE}/auth/pin/set`, {method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${authToken}`},body:JSON.stringify({pin,confirmPin:pin})}); alert((await r.json()).message); } catch { alert('Could not set PIN. Check your connection.'); } }); });
-
-// Keep the same request key after an ambiguous network failure, including reloads.
-async function paymentFetch(url, options) {
-    const body = JSON.parse(options.body);
-    delete body.pin;
-    const storageKey = 'gfgpay_pending_' + currentUser._id + '_' + url;
-    const signature = JSON.stringify(body);
-    const pending = JSON.parse(sessionStorage.getItem(storageKey) || 'null');
-    if (pending && pending.signature !== signature) throw new Error('Check the previous payment in history before changing this request.');
-    const key = pending?.key || crypto.randomUUID();
-    sessionStorage.setItem(storageKey, JSON.stringify({ signature, key }));
-    options.headers['Idempotency-Key'] = key;
-    const response = await fetch(url, options);
-    const result = await response.clone().json();
-    if (response.ok && result.data?.status === 'completed') sessionStorage.removeItem(storageKey);
-    else if ([400, 401, 403, 404, 422].includes(response.status)) sessionStorage.removeItem(storageKey);
-    return response;
-}
+bindForm('transfer',async(body,form)=>{const receiver=body.recipient.trim();const byUpi=receiver.includes('@');const query=byUpi?'upiId':'phoneNumber';await api('/transfer/verify?'+query+'='+encodeURIComponent(receiver));await payment('/transfer/'+(byUpi?'upi':'phone'),{[byUpi?'receiverUpiId':'receiverPhone']:receiver,amount:Number(body.amount),pin:body.pin,...(body.note?{note:body.note}:{})});form.reset();});
+bindForm('topup',async(body,form)=>{await payment('/wallet/add-money',{amount:Number(body.amount),source:'bank'});form.reset();});
+bindForm('withdraw',async(body,form)=>{await payment('/wallet/withdraw',{...body,amount:Number(body.amount)});form.reset();});
+action('checkPayment',async()=>{const p=pending();if(!p)return;try{const r=await api('/transactions/idempotency/'+p.key);if(r.data.transaction.status==='completed'){localStorage.removeItem(pendingKey());showPending();await dashboard();message('Confirmed: '+r.data.transaction.referenceId);}else message('Payment is still processing.');}catch(e){if(e.status===404)message('No committed payment found. Retry the same payment safely.');else throw e;}});
+action('retryPayment',async()=>{const p=pending();if(!p)return;const body={...p.body};if(p.path!=='/wallet/add-money'){body.pin=prompt('Enter your PIN to retry the same payment');if(!body.pin)return;}await payment(p.path,body,p);});
+async function history(){const query=new URLSearchParams({page:String(page),limit:'10'});Object.entries(fields($('filters'))).forEach(([k,v])=>{if(v)query.set(k,k==='endDate'?v+'T23:59:59.999Z':v);});const r=await api('/transactions?'+query);$('transactions').replaceChildren();for(const tx of r.data){const el=document.createElement('div');el.className='transaction';el.textContent=`${tx.direction==='debit'?'−':'+'}${money(tx.amount)} · ${tx.description} · ${tx.status} · ${new Date(tx.createdAt).toLocaleString()} · ${tx.referenceId}`;$('transactions').append(el);}if(!r.data.length)$('transactions').textContent='No transactions found.';const p=r.meta.pagination;$('page').textContent=` Page ${p.page} of ${Math.max(p.totalPages,1)} `;$('previous').disabled=!p.hasPrevPage;$('next').disabled=!p.hasNextPage;}
+bindForm('filters',async()=>{page=1;await history();});action('previous',async()=>{page--;await history();});action('next',async()=>{page++;await history();});
+async function analytics(){const r=await api('/transactions/summary?period='+$('period').value);const s=r.data.summary;$('summary').textContent=`Sent / withdrawn: ${money(s.totalSent)} · Received / deposited: ${money(s.totalReceived)} · ${s.transactionCount} completed transactions`;}
+$('period').addEventListener('change',()=>analytics().catch(e=>message(e.message,true)));
+for(const [id,path]of [['setPin','/auth/pin/set'],['changePin','/auth/pin/change'],['password','/auth/password/change']])bindForm(id,async(body,form)=>{const r=await post(path,body);form.reset();if(id==='password')signedOut();message(r.message);});
+async function banks(){const r=await api('/bank-accounts');$('banks').replaceChildren();$('withdrawBank').replaceChildren(new Option('Choose account',''));for(const bank of r.data.bankAccounts){const el=document.createElement('div');el.className='bank';const label=document.createElement('span');label.textContent=`${bank.bankName} · ${bank.maskedAccountNumber}${bank.isPrimary?' · Primary':''} `;el.append(label);for(const [text,method,path]of [['Make primary','POST',`/bank-accounts/${bank._id}/primary`],['Remove','DELETE',`/bank-accounts/${bank._id}`]]){const button=document.createElement('button');button.textContent=text;button.addEventListener('click',async()=>{button.disabled=true;try{await api(path,{method});await banks();}catch(e){message(e.message,true);button.disabled=false;}});el.append(button);}$('banks').append(el);$('withdrawBank').add(new Option(`${bank.bankName} ${bank.maskedAccountNumber}`,bank._id));}}
+bindForm('addBank',async(body,form)=>{await post('/bank-accounts',body);form.reset();await banks();message('Bank account added for simulated withdrawals.');});
+if(tokens)enter().catch(e=>{signedOut();message(e.message,true);});

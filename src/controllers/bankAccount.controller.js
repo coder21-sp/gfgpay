@@ -42,11 +42,6 @@ const setPrimaryAccount = catchAsync(async (req, res) => {
   ApiResponse.success(res, 200, 'Primary account set', { bankAccount });
 });
 
-const getBankAccountTransactions = catchAsync(async (req, res) => {
-  const transactions = await bankAccountService.getBankAccountTransactions(req.params.accountId, req.user._id);
-  ApiResponse.success(res, 200, 'Bank account transactions retrieved', { transactions });
-});
-
 module.exports = {
   addBankAccount,
   getBankAccounts,

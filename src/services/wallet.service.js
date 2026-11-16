@@ -41,9 +41,10 @@ const getBalance = async (userId) => {
  */
 const addMoney = async (userId, amount, source, sourceId = null, idempotencyKey = null, requestFingerprint = null) => {
   const session = await mongoose.startSession();
-  session.startTransaction();
+
   
   try {
+    return await session.withTransaction(async () => {
     const wallet = await Wallet.findOne({ user: userId, isActive: true }).session(session);
     
     if (!wallet) {
@@ -82,7 +83,7 @@ const addMoney = async (userId, amount, source, sourceId = null, idempotencyKey 
     transaction[0].balanceAfterReceiver = updatedWallet.balance;
     await transaction[0].save({ session });
     
-    await session.commitTransaction();
+
     
     logger.info(`Deposit completed: ${transaction[0].referenceId} - Amount: ${amount}`);
     
@@ -90,8 +91,8 @@ const addMoney = async (userId, amount, source, sourceId = null, idempotencyKey 
       transaction: transaction[0],
       newBalance: updatedWallet.balance,
     };
+    });
   } catch (error) {
-    await session.abortTransaction();
     logger.error(`Deposit failed for user ${userId}: ${error.message}`);
     throw error;
   } finally {
@@ -107,9 +108,10 @@ const withdrawMoney = async (userId, amount, bankAccountId, idempotencyKey = nul
     throw ApiError.notFound('Bank account not found');
   }
   const session = await mongoose.startSession();
-  session.startTransaction();
+
   
   try {
+    return await session.withTransaction(async () => {
     const wallet = await Wallet.findOne({ user: userId, isActive: true }).session(session);
     
     if (!wallet) {
@@ -151,7 +153,7 @@ const withdrawMoney = async (userId, amount, bankAccountId, idempotencyKey = nul
     transaction[0].balanceAfterSender = updatedWallet.balance;
     await transaction[0].save({ session });
     
-    await session.commitTransaction();
+
     
     logger.info(`Withdrawal completed: ${transaction[0].referenceId} - Amount: ${amount}`);
     
@@ -159,8 +161,8 @@ const withdrawMoney = async (userId, amount, bankAccountId, idempotencyKey = nul
       transaction: transaction[0],
       newBalance: updatedWallet.balance,
     };
+    });
   } catch (error) {
-    await session.abortTransaction();
     logger.error(`Withdrawal failed for user ${userId}: ${error.message}`);
     throw error;
   } finally {

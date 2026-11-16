@@ -67,6 +67,8 @@ const userSchema = new mongoose.Schema(
       type: String,
       select: false,
     },
+    bankVersion: { type: Number, default: 0 },
+    authVersion: { type: Number, default: 0 },
     deviceId: {
       type: String,
       default: null,

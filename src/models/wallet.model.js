@@ -146,7 +146,7 @@ walletSchema.methods.resetDailySpent = async function () {
     this.dailySpent = 0;
     this.dailySpentDate = today;
     const updated = await this.constructor.findOneAndUpdate({ _id: this._id, dailySpentDate: { $lt: today } }, { $set: { dailySpent: 0, dailySpentDate: today }, $inc: { version: 1 } }, { new: true });
-    if (updated) Object.assign(this, updated.toObject());
+    Object.assign(this, (updated || await this.constructor.findById(this._id)).toObject());
   }
 };
 

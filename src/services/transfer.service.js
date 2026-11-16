@@ -71,16 +71,11 @@ const executeTransfer = async (senderId, receiverId, amount, note, idempotencyKe
     throw ApiError.badRequest(`Maximum transfer amount is ₹${config.transaction.maxAmount}`);
   }
   
-  // Check if sender can transfer
-  const canTransferResult = await walletService.canTransfer(senderId, amount);
-  if (!canTransferResult.canTransfer) {
-    throw ApiError.badRequest(canTransferResult.reason);
-  }
-  
   const session = await mongoose.startSession();
-  session.startTransaction();
+
   
   try {
+    return await session.withTransaction(async () => {
     // Get sender and receiver wallets with lock
     const senderWallet = await Wallet.findOne({ user: senderId, isActive: true }).session(session);
     const receiverWallet = await Wallet.findOne({ user: receiverId, isActive: true }).session(session);
@@ -152,7 +147,7 @@ const executeTransfer = async (senderId, receiverId, amount, note, idempotencyKe
     transaction[0].balanceAfterReceiver = updatedReceiverWallet.balance;
     await transaction[0].save({ session });
     
-    await session.commitTransaction();
+
     
     logger.info(`Transfer completed: ${transaction[0].referenceId} - ₹${amount} from ${sender.upiId} to ${receiver.upiId}`);
     
@@ -160,8 +155,8 @@ const executeTransfer = async (senderId, receiverId, amount, note, idempotencyKe
       transaction: transaction[0],
       senderBalance: updatedSenderWallet.balance,
     };
+    });
   } catch (error) {
-    await session.abortTransaction();
     
     logger.error(`Transfer failed: ${error.message}`, {
       senderId,
@@ -175,7 +170,7 @@ const executeTransfer = async (senderId, receiverId, amount, note, idempotencyKe
       throw error;
     }
     
-    throw ApiError.transactionFailed(error.message);
+    throw error;
   } finally {
     session.endSession();
   }
@@ -213,9 +208,10 @@ const verifyReceiver = async (senderId, { upiId, phoneNumber }) => {
  */
 const reverseTransaction = async (transactionId, reason, adminId) => {
   const session = await mongoose.startSession();
-  session.startTransaction();
+
   
   try {
+    return await session.withTransaction(async () => {
     const originalTx = await Transaction.findById(transactionId).session(session);
     
     if (!originalTx) {
@@ -266,13 +262,13 @@ const reverseTransaction = async (transactionId, reason, adminId) => {
     originalTx.metadata.reversalReason = reason;
     await originalTx.save({ session });
     
-    await session.commitTransaction();
+
     
     logger.info(`Transaction reversed: ${originalTx.referenceId} - Refund: ${refundTx[0].referenceId}`);
     
     return refundTx[0];
+    });
   } catch (error) {
-    await session.abortTransaction();
     throw error;
   } finally {
     session.endSession();

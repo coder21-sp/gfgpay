@@ -37,11 +37,6 @@ const checkTransferEligibility = catchAsync(async (req, res) => {
   ApiResponse.success(res, 200, 'Eligibility checked', result);
 });
 
-const getWalletTransactions = catchAsync(async (req, res) => {
-  const transactions = await walletService.getWalletTransactions(req.user._id);
-  ApiResponse.success(res, 200, 'Wallet transactions retrieved', { transactions });
-});
-
 module.exports = {
   getBalance,
   addMoney,

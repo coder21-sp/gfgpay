@@ -48,26 +48,6 @@ const changePassword = catchAsync(async (req, res) => {
   ApiResponse.success(res, 200, 'Password changed successfully');
 });
 
-const forgotPassword = catchAsync(async (req, res) => {
-  await authService.forgotPassword(req.body.email);
-  ApiResponse.success(res, 200, 'Password reset email sent');
-});
-
-const resetPassword = catchAsync(async (req, res) => {
-  await authService.resetPassword(req.body.token, req.body.password);
-  ApiResponse.success(res, 200, 'Password reset successfully');
-});
-
-const verifyEmail = catchAsync(async (req, res) => {
-  await authService.verifyEmail(req.body.token);
-  ApiResponse.success(res, 200, 'Email verified successfully');
-});
-
-const resendVerificationEmail = catchAsync(async (req, res) => {
-  await authService.resendVerificationEmail(req.body.email);
-  ApiResponse.success(res, 200, 'Verification email resent');
-}); 
-
 module.exports = {
   register,
   login,
